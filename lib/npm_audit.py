@@ -7,18 +7,21 @@ npm audit 은 취약점이 아니라 의존성 경로상의 패키지를 센다.
 
 출력 (한 줄, | 구분):
   차단대상수 | NOFIX수 | 고유취약점수 | NOFIX패키지목록(쉼표)
-읽기 실패 시 -1 로 시작하는 줄.
+판정 불가(스키마 불일치·읽기 실패) 시 -1 로 시작하는 줄 -> 호출 측에서 통과로
+세지 않는다.
 """
 import json
 import sys
 
 BLOCKING = ("high", "critical")
+SUPPORTED_REPORT_VERSION = 2
 
 
 def advisories(pkg):
     """via 항목 중 high/critical advisory 만 추출 -> (source, title)
 
-    via 에는 해당 패키지의 모든 등급 advisory 가 들어오므로 등급으로 거른다.
+    via 에는 전이 경로상의 패키지 이름(문자열)과 실제 advisory(객체)가 섞여
+    들어오고, 객체에는 해당 패키지의 모든 등급 advisory 가 포함된다.
     """
     out = set()
     for v in pkg.get("via", []):
@@ -27,38 +30,64 @@ def advisories(pkg):
     return out
 
 
+def classify(pkg):
+    """fixAvailable 의 세 형태를 게이트 판정용으로 나눈다.
+
+    True  -> npm audit fix 로 해결됨                  : 차단
+    dict  -> 다른 패키지를 특정 버전으로 갈아야 함     : 차단 (조치 가능하므로)
+    False -> 수정본 없음                              : 기록만
+    없음  -> 판정 불가 -> 차단 쪽으로 보수적으로 처리
+    """
+    fix = pkg.get("fixAvailable", "MISSING")
+    if fix is False:
+        return "nofix"
+    return "block"
+
+
 def main():
+    if len(sys.argv) < 2:
+        print("-1|0|0|인자없음")
+        return 2
     try:
         with open(sys.argv[1], encoding="utf-8") as fh:
             data = json.load(fh)
     except Exception:
-        print("-1|0|0|")
-        return
+        print("-1|0|0|읽기실패")
+        return 2
 
-    vulns = data.get("vulnerabilities", {})
-    fixable, nofix = set(), set()
+    # 스키마 가드: npm 6 형식(advisories 키)이나 미지원 버전이 들어오면
+    # 빈 결과가 나오므로 통과로 읽히지 않게 판정 불가로 끊는다.
+    ver = data.get("auditReportVersion")
+    if ver != SUPPORTED_REPORT_VERSION or "vulnerabilities" not in data:
+        print("-1|0|0|스키마불일치(auditReportVersion=%s)" % ver)
+        return 2
+
+    vulns = data["vulnerabilities"]
+    blocking, nofix = set(), set()
     nofix_pkgs = []
 
     for name, pkg in vulns.items():
         if pkg.get("severity") not in BLOCKING:
             continue
         adv = advisories(pkg)
-        # 이 패키지 자체에 advisory 가 없으면 상위 전파분 -> 뿌리에서 이미 계산됨
+        # advisory 가 없으면 상위 전파분 -> 뿌리에서 이미 계산됨
         if not adv:
             continue
-        if pkg.get("fixAvailable") is False and pkg.get("severity") != "critical":
+        # critical 은 수정본이 없어도 차단한다
+        if classify(pkg) == "nofix" and pkg.get("severity") != "critical":
             nofix |= adv
             nofix_pkgs.append(name)
         else:
-            fixable |= adv
+            blocking |= adv
 
     print("%d|%d|%d|%s" % (
-        len(fixable),
+        len(blocking),
         len(nofix),
-        len(fixable | nofix),
+        len(blocking | nofix),
         ",".join(sorted(nofix_pkgs)[:8]),
     ))
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

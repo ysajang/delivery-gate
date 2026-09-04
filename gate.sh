@@ -110,7 +110,8 @@ if [ -f "$TARGET/package.json" ]; then
     IFS='|' read -r A_FIXABLE A_NOFIX A_TOTAL _ <<< "$SUM_ALL"
 
     if [ "${P_FIXABLE:--1}" -lt 0 ] 2>/dev/null; then
-      skip "G3 npm audit 실행 실패 -> $OUT/dep-npm.err 확인"
+      # 판정 불가를 통과로 세지 않는다 -> 의존성 점검을 못 한 채 납품되는 것을 막는다
+      fail "G3 npm audit 판정 불가 (${P_NOFIXPKG:-원인불명}) -> $OUT/dep-npm.err 확인"
     elif [ "$P_FIXABLE" -gt 0 ]; then
       fail "G3 프로덕션 취약점 ${P_FIXABLE}건 (수정 가능) -> $OUT/dep-npm-prod.json"
     else
