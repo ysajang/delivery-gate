@@ -100,13 +100,31 @@ DEP_RAN=0
 if [ -f "$TARGET/package.json" ]; then
   DEP_RAN=1
   if [ -f "$TARGET/package-lock.json" ] || [ -f "$TARGET/npm-shrinkwrap.json" ]; then
-    ( cd "$TARGET" && npm audit --audit-level=high --json > "$OUT/dep-npm.json" 2>"$OUT/dep-npm.err" )
-    if python3 -c "import json,sys;d=json.load(open('$OUT/dep-npm.json'));v=d.get('metadata',{}).get('vulnerabilities',{});sys.exit(1 if (v.get('high',0)+v.get('critical',0))>0 else 0)" 2>/dev/null; then
-      pass "G3 npm high/critical 없음"
-    elif [ -s "$OUT/dep-npm.json" ]; then
-      fail "G3 npm high/critical 취약점 -> $OUT/dep-npm.json"
-    else
+    # 차단 기준은 프로덕션 의존성만 -> dev 도구의 ReDoS/DoS 로 납품을 막지 않는다
+    ( cd "$TARGET" && npm audit --omit=dev --json > "$OUT/dep-npm-prod.json" 2>"$OUT/dep-npm.err" )
+    ( cd "$TARGET" && npm audit --json > "$OUT/dep-npm-all.json" 2>>"$OUT/dep-npm.err" )
+
+    NPM_CNT() { python3 -c "
+import json,sys
+try: d=json.load(open(sys.argv[1]))
+except Exception: print(-1); raise SystemExit
+v=d.get('metadata',{}).get('vulnerabilities',{})
+print(v.get('high',0)+v.get('critical',0))" "$1" 2>/dev/null || echo -1; }
+
+    PROD_N="$(NPM_CNT "$OUT/dep-npm-prod.json")"
+    ALL_N="$(NPM_CNT "$OUT/dep-npm-all.json")"
+
+    if [ "${PROD_N:--1}" -lt 0 ] 2>/dev/null; then
       skip "G3 npm audit 실행 실패 -> $OUT/dep-npm.err 확인"
+    elif [ "$PROD_N" -gt 0 ]; then
+      fail "G3 npm 프로덕션 high/critical ${PROD_N}건 -> $OUT/dep-npm-prod.json"
+    else
+      pass "G3 npm 프로덕션 high/critical 없음"
+    fi
+
+    if [ "${ALL_N:--1}" -gt 0 ] 2>/dev/null && [ "${PROD_N:-0}" -ge 0 ]; then
+      DEV_N=$(( ALL_N - PROD_N ))
+      [ "$DEV_N" -gt 0 ] && warn "G3 dev 의존성 high/critical ${DEV_N}건 (차단 대상 아님) -> $OUT/dep-npm-all.json"
     fi
   else
     skip "G3 npm 락파일 없음 -> npm install 후 재실행"

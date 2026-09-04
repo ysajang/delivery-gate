@@ -21,7 +21,7 @@ gitleaks 최신 바이너리를 `bin/`에 내려받고 semgrep을 설치한다.
 |---|---|---|
 | G1 | 시크릿 (작업트리 + 커밋이력) | gitleaks `dir`, `git` |
 | G2 | 취약 패턴, ERROR 등급만 | semgrep `p/default` + `p/owasp-top-ten` + 스택별 |
-| G3 | 취약 의존성 | npm audit / composer audit / dotnet list package |
+| G3 | 취약 의존성 (프로덕션만 차단) | npm audit / composer audit / dotnet list package |
 
 하나라도 걸리면 exit 1. 결과는 `reports/<리포명>-<타임스탬프>/`에 남는다.
 
@@ -30,6 +30,10 @@ G2는 자동생성·빌드 산출물(`generated` `node_modules` `.next` `dist` `
 
 semgrep이 파일을 파싱하지 못하면 그 구간은 룰이 돌지 않은 것이므로 요약에 `WARN`으로
 표시한다. `WARN`은 exit 코드를 바꾸지 않지만 커버리지 구멍이므로 무시하지 않는다.
+
+G3는 `--omit=dev` 결과만 차단 기준으로 삼는다. 린터·코드젠 같은 빌드 도구의
+ReDoS/DoS 로 납품을 막으면 노이즈가 커져 게이트 전체가 무시되기 때문이다.
+dev 쪽 건수는 `WARN`으로만 표시한다.
 
 ## 한계
 
