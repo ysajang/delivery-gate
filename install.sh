@@ -44,6 +44,30 @@ if [ -z "$SG" ]; then
   exit 1
 fi
 
+# semgrep 본체는 실행 시 pysemgrep 을 PATH 에서 찾아 exec 한다 -> 짝을 같이 링크한다
+SGDIR="$(dirname "$(readlink -f "$SG")")"
+PYSG=""
+for c in "$SGDIR/pysemgrep" "$HOME/.local/bin/pysemgrep" "/usr/local/bin/pysemgrep" \
+         "$(python3 -m site --user-base 2>/dev/null)/bin/pysemgrep"; do
+  [ -x "$c" ] && { PYSG="$c"; break; }
+done
+
+if [ -z "$PYSG" ]; then
+  echo "pysemgrep 을 찾지 못했습니다 -> semgrep 설치가 불완전합니다. 재설치합니다"
+  pip3 install --user --break-system-packages -q --force-reinstall semgrep \
+    || { echo "재설치 실패 -> sudo apt install pipx && pipx install semgrep 후 재실행"; exit 1; }
+  for c in "$HOME/.local/bin/pysemgrep" "$(python3 -m site --user-base 2>/dev/null)/bin/pysemgrep"; do
+    [ -x "$c" ] && { PYSG="$c"; break; }
+  done
+  SG="$(find_semgrep || true)"
+fi
+
 ln -sf "$SG" "$HERE/bin/semgrep"
-"$HERE/bin/semgrep" --version
+[ -n "$PYSG" ] && ln -sf "$PYSG" "$HERE/bin/pysemgrep"
+
+PATH="$HERE/bin:$PATH" semgrep --version || {
+  echo "semgrep 실행 검증 실패 -> 아래 결과를 알려주십시오"
+  echo "  ls -la \"$HERE/bin\" ; ls -la \"$HOME/.local/bin\" | grep -i semgrep"
+  exit 1
+}
 echo "설치 완료 -> ./gate.sh <대상경로>"
