@@ -18,6 +18,7 @@ log()  { printf '\n\033[1m== %s\033[0m\n' "$1"; }
 pass() { RESULT+=("PASS  $1"); printf '\033[32mPASS\033[0m  %s\n' "$1"; }
 fail() { RESULT+=("FAIL  $1"); FAIL=1; printf '\033[31mFAIL\033[0m  %s\n' "$1"; }
 skip() { RESULT+=("SKIP  $1"); printf '\033[33mSKIP\033[0m  %s\n' "$1"; }
+warn() { RESULT+=("WARN  $1"); printf '\033[33mWARN\033[0m  %s\n' "$1"; }
 
 # ---------- G1: 시크릿 ----------
 log "G1 시크릿 스캔 (gitleaks)"
@@ -47,13 +48,38 @@ if command -v semgrep >/dev/null 2>&1; then
   ls "$TARGET"/**/*.csproj >/dev/null 2>&1 && CONF+=(--config p/csharp)
   [ -f "$TARGET/nginx.conf" ]          && CONF+=(--config p/nginx)
 
-  semgrep scan "${CONF[@]}" --severity ERROR --error --metrics=off --quiet \
+  EXC=(--exclude generated --exclude node_modules --exclude .next --exclude dist
+       --exclude build --exclude vendor --exclude test-results --exclude "*.min.js"
+       --exclude "*.bundle.js" --exclude "*.lock" --exclude package-lock.json)
+
+  semgrep scan "${CONF[@]}" "${EXC[@]}" --severity ERROR --error --metrics=off --quiet \
     --json --output "$OUT/sast.json" "$TARGET" >/dev/null 2>&1
-  case $? in
+  SG=$?
+  case $SG in
     0) pass "G2 ERROR 등급 지적 없음" ;;
     1) fail "G2 ERROR 등급 지적 있음 -> $OUT/sast.json" ;;
     *) fail "G2 semgrep 실행 실패 (네트워크/룰셋 확인)" ;;
   esac
+
+  # 파싱 실패 = 룰이 안 돈 구간 -> 커버리지 구멍이므로 표면화
+  if [ -s "$OUT/sast.json" ]; then
+    PARSE=$(python3 - "$OUT/sast.json" <<'PY'
+import json,sys,os
+d=json.load(open(sys.argv[1]))
+files=set()
+for e in d.get("errors",[]):
+    p=e.get("path")
+    if p: files.add(os.path.basename(p))
+scanned=len(d.get("paths",{}).get("scanned",[]))
+print(f"{len(files)}|{scanned}|{','.join(sorted(files)[:5])}")
+PY
+)
+    P_CNT="${PARSE%%|*}"; REST="${PARSE#*|}"; P_SCAN="${REST%%|*}"; P_FILES="${REST#*|}"
+    if [ "${P_CNT:-0}" -gt 0 ] 2>/dev/null; then
+      warn "G2 파싱 실패 ${P_CNT}개 파일 -> 해당 구간은 룰 미적용 (${P_FILES})"
+    fi
+    [ -n "${P_SCAN:-}" ] && echo "     스캔 파일 ${P_SCAN}개"
+  fi
 else
   fail "G2 semgrep 미설치 -> install.sh 실행"
 fi
