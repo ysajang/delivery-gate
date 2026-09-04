@@ -3,7 +3,17 @@
 # 사용법: ./gate.sh [대상경로]   (기본값: 현재 디렉터리)
 set -uo pipefail
 
-TARGET="$(cd "${1:-.}" && pwd)"
+TARGET_RAW="${1:-.}"
+if [ ! -d "$TARGET_RAW" ]; then
+  printf '\033[31m대상 경로가 없습니다: %s\033[0m\n' "$TARGET_RAW" >&2
+  printf '사용법: ./gate.sh ~/projects_wsl/<프로젝트명>\n' >&2
+  exit 2
+fi
+TARGET="$(cd "$TARGET_RAW" && pwd)"
+if [ -z "$TARGET" ]; then
+  printf '\033[31m대상 경로를 확정하지 못했습니다: %s\033[0m\n' "$TARGET_RAW" >&2
+  exit 2
+fi
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BIN="$HERE/bin"
 STAMP="$(date +%Y%m%d-%H%M%S)"
