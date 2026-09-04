@@ -104,27 +104,27 @@ if [ -f "$TARGET/package.json" ]; then
     ( cd "$TARGET" && npm audit --omit=dev --json > "$OUT/dep-npm-prod.json" 2>"$OUT/dep-npm.err" )
     ( cd "$TARGET" && npm audit --json > "$OUT/dep-npm-all.json" 2>>"$OUT/dep-npm.err" )
 
-    NPM_CNT() { python3 -c "
-import json,sys
-try: d=json.load(open(sys.argv[1]))
-except Exception: print(-1); raise SystemExit
-v=d.get('metadata',{}).get('vulnerabilities',{})
-print(v.get('high',0)+v.get('critical',0))" "$1" 2>/dev/null || echo -1; }
+    SUM_PROD="$(python3 "$HERE/lib/npm_audit.py" "$OUT/dep-npm-prod.json")"
+    SUM_ALL="$(python3 "$HERE/lib/npm_audit.py" "$OUT/dep-npm-all.json")"
+    IFS='|' read -r P_FIXABLE P_NOFIX P_TOTAL P_NOFIXPKG <<< "$SUM_PROD"
+    IFS='|' read -r A_FIXABLE A_NOFIX A_TOTAL _ <<< "$SUM_ALL"
 
-    PROD_N="$(NPM_CNT "$OUT/dep-npm-prod.json")"
-    ALL_N="$(NPM_CNT "$OUT/dep-npm-all.json")"
-
-    if [ "${PROD_N:--1}" -lt 0 ] 2>/dev/null; then
+    if [ "${P_FIXABLE:--1}" -lt 0 ] 2>/dev/null; then
       skip "G3 npm audit 실행 실패 -> $OUT/dep-npm.err 확인"
-    elif [ "$PROD_N" -gt 0 ]; then
-      fail "G3 npm 프로덕션 high/critical ${PROD_N}건 -> $OUT/dep-npm-prod.json"
+    elif [ "$P_FIXABLE" -gt 0 ]; then
+      fail "G3 프로덕션 취약점 ${P_FIXABLE}건 (수정 가능) -> $OUT/dep-npm-prod.json"
     else
-      pass "G3 npm 프로덕션 high/critical 없음"
+      pass "G3 프로덕션 수정 가능한 high/critical 없음"
     fi
 
-    if [ "${ALL_N:--1}" -gt 0 ] 2>/dev/null && [ "${PROD_N:-0}" -ge 0 ]; then
-      DEV_N=$(( ALL_N - PROD_N ))
-      [ "$DEV_N" -gt 0 ] && warn "G3 dev 의존성 high/critical ${DEV_N}건 (차단 대상 아님) -> $OUT/dep-npm-all.json"
+    # 수정본이 없는 high 는 마스터가 손쓸 수 없으므로 차단하지 않고 기록만 한다
+    # (critical NOFIX 는 npm_audit.py 가 차단 대상으로 분류한다)
+    if [ "${P_NOFIX:-0}" -gt 0 ] 2>/dev/null; then
+      warn "G3 프로덕션 수정본 없는 취약점 ${P_NOFIX}건 -> 납품 문서에 기록 필요 (${P_NOFIXPKG})"
+    fi
+
+    if [ "${A_TOTAL:-0}" -gt "${P_TOTAL:-0}" ] 2>/dev/null; then
+      warn "G3 dev 전용 취약점 $(( A_TOTAL - P_TOTAL ))건 (차단 대상 아님) -> $OUT/dep-npm-all.json"
     fi
   else
     skip "G3 npm 락파일 없음 -> npm install 후 재실행"
