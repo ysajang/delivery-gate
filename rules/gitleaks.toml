@@ -1,0 +1,29 @@
+# gitleaks 기본 룰 + 기본 룰이 놓치는 모바일 앱 하드코딩 패턴
+# 추가 근거: 안드로이드 공개 리포에서 실제로 발견됐으나 기본 룰로는 0건이던 형태
+title = "delivery-gate"
+
+[extend]
+useDefault = true
+
+# FCM 레거시 서버 키 - 앱에 넣으면 누구나 전 사용자에게 푸시를 보낼 수 있다
+[[rules]]
+id = "fcm-legacy-server-key"
+description = "Firebase Cloud Messaging legacy server key"
+regex = '''AAAA[A-Za-z0-9_-]{7}:APA91b[A-Za-z0-9_-]{100,}'''
+keywords = ["apa91b"]
+
+# client secret 리터럴 - 코드 대입, 헤더 인자, 리소스 문자열 세 형태
+[[rules]]
+id = "client-secret-literal"
+description = "OAuth/API client secret written as a literal"
+regex = '''(?i)(?:x-naver-client-secret|client[_-]?secret)(?:\s*["']?\s*[:=]\s*|["']\s*,\s*|["']>)["']?([A-Za-z0-9_\-]{8,64})["'<]'''
+secretGroup = 1
+keywords = ["secret"]
+
+# 카카오 REST API 키 - 서버용 키. 네이티브 앱 키(매니페스트 AppKey)는 앱에 들어가는 값이라 제외
+[[rules]]
+id = "kakao-rest-api-key"
+description = "Kakao REST API key"
+regex = '''(?i)(?:kakao[a-z_]*(?:key|rest|api)[a-z_]*["']?\s*(?:>|[:=]\s*["'])|kakaoak\s+)([0-9a-f]{32})\b'''
+secretGroup = 1
+keywords = ["kakao"]

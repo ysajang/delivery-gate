@@ -19,11 +19,16 @@ gitleaks 최신 바이너리를 `bin/`에 내려받고 semgrep을 설치한다.
 
 | 게이트 | 내용 | 도구 |
 |---|---|---|
-| G1 | 시크릿 (작업트리 + 커밋이력) | gitleaks `dir`, `git` |
+| G1 | 시크릿 (작업트리 + 커밋이력) | gitleaks `dir`, `git` + `rules/gitleaks.toml` |
 | G2 | 취약 패턴, ERROR 등급만 | semgrep `p/default` + `p/owasp-top-ten` + 스택별 |
 | G3 | 취약 의존성 (프로덕션만 차단) | npm audit / composer audit / dotnet list package |
 
 하나라도 걸리면 exit 1. 결과는 `reports/<리포명>-<타임스탬프>/`에 남는다.
+
+G1은 gitleaks 기본 룰에 `rules/gitleaks.toml`의 추가 룰을 얹는다. 기본 룰은 FCM 레거시
+서버 키, 코드·리소스에 박힌 client secret, 카카오 REST 키를 잡지 못한다(안드로이드 공개
+리포 16개 실측에서 실제 노출 7건 중 0건). 룰을 고치면 `tests/test_g1_rules.sh`로 탐지와
+오탐을 함께 확인한다.
 
 G2는 자동생성·빌드 산출물(`generated` `node_modules` `.next` `dist` `build` `vendor`
 `test-results` 압축 JS 락파일)을 제외한다. 볼 것이 없으면서 파싱 경고만 만들기 때문.

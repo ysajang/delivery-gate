@@ -31,14 +31,17 @@ skip() { RESULT+=("SKIP  $1"); printf '\033[33mSKIP\033[0m  %s\n' "$1"; }
 warn() { RESULT+=("WARN  $1"); printf '\033[33mWARN\033[0m  %s\n' "$1"; }
 
 # ---------- G1: 시크릿 ----------
-log "G1 시크릿 스캔 (gitleaks)"
-if command -v gitleaks >/dev/null 2>&1; then
-  gitleaks dir "$TARGET" --no-banner --redact \
+log "G1 시크릿 스캔 (gitleaks 기본 룰 + rules/gitleaks.toml)"
+GL_CONF="$HERE/rules/gitleaks.toml"
+if [ ! -f "$GL_CONF" ]; then
+  fail "G1 룰 파일 없음 ($GL_CONF) -> git pull 로 복구"
+elif command -v gitleaks >/dev/null 2>&1; then
+  gitleaks dir "$TARGET" --config "$GL_CONF" --no-banner --redact \
     --report-format json --report-path "$OUT/secrets-worktree.json" >/dev/null 2>&1
   [ $? -eq 0 ] && pass "G1a 작업트리 시크릿 없음" || fail "G1a 작업트리 시크릿 발견 -> $OUT/secrets-worktree.json"
 
   if [ -d "$TARGET/.git" ]; then
-    gitleaks git "$TARGET" --no-banner --redact \
+    gitleaks git "$TARGET" --config "$GL_CONF" --no-banner --redact \
       --report-format json --report-path "$OUT/secrets-history.json" >/dev/null 2>&1
     [ $? -eq 0 ] && pass "G1b 커밋이력 시크릿 없음" || fail "G1b 커밋이력 시크릿 발견 -> $OUT/secrets-history.json"
   else

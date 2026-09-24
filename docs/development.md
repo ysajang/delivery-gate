@@ -4,6 +4,8 @@
 
 - `gate.sh` 게이트 본체 (bash)
 - `lib/` 게이트가 호출하는 판정 스크립트 (python3 표준 라이브러리만 사용)
+- `rules/gitleaks.toml` G1 룰 (gitleaks 기본 룰 + 추가 룰)
+- `tests/` 회귀 테스트
 - `install.sh` 외부 도구 설치 (WSL/Ubuntu 기준)
 - `manual-checks.md` 스캐너가 못 잡는 수동 확인 목록
 - `skills/delivery-gate/SKILL.md` 게이트 운용 절차
@@ -17,7 +19,7 @@
 
 - 셸 문법: `bash -n gate.sh install.sh`
 - 판정 스크립트: `python3 -m py_compile lib/*.py`
-- 자동 테스트: 미작성
+- G1 룰: `./tests/test_g1_rules.sh` (gitleaks 필요)
 
 ## 원칙
 
