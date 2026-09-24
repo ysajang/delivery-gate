@@ -20,10 +20,10 @@ regex = '''(?i)(?:x-naver-client-secret|client[_-]?secret)(?:\s*["']?\s*[:=]\s*|
 secretGroup = 1
 keywords = ["secret"]
 
-# 카카오 REST API 키 - 서버용 키. 네이티브 앱 키(매니페스트 AppKey)는 앱에 들어가는 값이라 제외
+# 카카오 REST API 키 - 서버용 키. 네이티브 앱 키(kakao_app_key, 매니페스트 AppKey)는 앱에 들어가는 값이라 제외
 [[rules]]
 id = "kakao-rest-api-key"
 description = "Kakao REST API key"
-regex = '''(?i)(?:kakao[a-z_]*(?:key|rest|api)[a-z_]*["']?\s*(?:>|[:=]\s*["'])|kakaoak\s+)([0-9a-f]{32})\b'''
+regex = '''(?i)(?:kakao_?(?:rest_?)?(?:api_?)?key["']?\s*(?:>|[:=]\s*["'])|kakaoak\s+)([0-9a-f]{32})\b'''
 secretGroup = 1
 keywords = ["kakao"]

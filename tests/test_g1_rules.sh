@@ -31,6 +31,8 @@ printf '//  buildConfigField "String", "NAVER_CLIENT_SECRET", properties['"'"'na
 printf 'object C {\n  const val client_secret = ""\n  const val client_secret2 = BuildConfig.NAVER_SECRET\n}\n' > "$T/neg/Empty.kt"
 printf '<meta-data android:name="com.kakao.sdk.AppKey" android:value="%s"/>\n' "$KKEY" > "$T/neg/AndroidManifest.xml"
 printf '"X-Naver-Client-Secret: ${Constants.client_secret}"\n' > "$T/neg/Uses.kt"
+# 카카오 네이티브 앱 키는 앱에 들어가는 값 (리소스에 둔 형태)
+printf '<resources>\n  <string name="kakao_app_key" >%s</string>\n  <string name="kakao_native_app_key">%s</string>\n</resources>\n' "$KKEY" "$KKEY" > "$T/neg/native_strings.xml"
 
 gitleaks dir "$T" --config "$HERE/rules/gitleaks.toml" --no-banner --redact \
   --report-format json --report-path "$T/r.json" >/dev/null 2>&1
@@ -48,7 +50,7 @@ expect = [
     ("KakaoHeader.kt", "kakao-rest-api-key"),
 ]
 custom = {"fcm-legacy-server-key", "client-secret-literal", "kakao-rest-api-key"}
-neg = {"build.gradle", "Empty.kt", "AndroidManifest.xml", "Uses.kt"}
+neg = {"build.gradle", "Empty.kt", "AndroidManifest.xml", "Uses.kt", "native_strings.xml"}
 bad = 0
 for e in expect:
     ok = e in hits
