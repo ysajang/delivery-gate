@@ -20,6 +20,7 @@
 - 셸 문법: `bash -n gate.sh install.sh`
 - 판정 스크립트: `python3 -m py_compile lib/*.py`
 - G1 룰: `./tests/test_g1_rules.sh` (gitleaks 필요)
+- G3 composer·dotnet 분기: `./tests/test_g3_fallbacks.sh` (실제 composer·dotnet 이 PATH 에 없어야 한다. 스텁으로 흉내 냄)
 
 ## 원칙
 

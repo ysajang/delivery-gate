@@ -134,18 +134,36 @@ if [ -f "$TARGET/package.json" ]; then
     skip "G3 npm 락파일 없음 -> npm install 후 재실행"
   fi
 fi
-if [ -f "$TARGET/composer.json" ] && command -v composer >/dev/null 2>&1; then
+if [ -f "$TARGET/composer.json" ]; then
   DEP_RAN=1
-  ( cd "$TARGET" && composer audit --format=json > "$OUT/dep-composer.json" 2>/dev/null )
-  [ $? -eq 0 ] && pass "G3 composer 취약점 없음" || fail "G3 composer 취약점 -> $OUT/dep-composer.json"
-fi
-if ls "$TARGET"/*.sln "$TARGET"/*.csproj >/dev/null 2>&1 && command -v dotnet >/dev/null 2>&1; then
-  DEP_RAN=1
-  ( cd "$TARGET" && dotnet list package --vulnerable --include-transitive > "$OUT/dep-dotnet.txt" 2>&1 )
-  if grep -qi "has the following vulnerable packages" "$OUT/dep-dotnet.txt"; then
-    fail "G3 dotnet 취약 패키지 -> $OUT/dep-dotnet.txt"
+  if ! command -v composer >/dev/null 2>&1; then
+    fail "G3 composer 미설치 -> 의존성 판정 불가"
   else
-    pass "G3 dotnet 취약 패키지 없음"
+    # 종료코드 1 은 취약·abandoned·설치 누락을 함께 뜻한다 -> 어느 쪽이든 차단하고 리포트로 구분
+    ( cd "$TARGET" && composer audit --no-dev --format=json > "$OUT/dep-composer.json" 2>"$OUT/dep-composer.err" )
+    [ $? -eq 0 ] && pass "G3 composer 문제 없음" \
+      || fail "G3 composer 취약·abandoned 또는 판정 불가 -> $OUT/dep-composer.json, dep-composer.err"
+  fi
+fi
+# ls 로 여러 glob 을 한 번에 검사하면 하나만 없어도 실패한다 -> glob 마다 따로 확인
+has_glob() { compgen -G "$1" >/dev/null 2>&1; }
+if has_glob "$TARGET/*.sln" || has_glob "$TARGET/*.csproj"; then
+  DEP_RAN=1
+  if ! command -v dotnet >/dev/null 2>&1; then
+    fail "G3 dotnet 미설치 -> 의존성 판정 불가"
+  else
+    ( cd "$TARGET" && dotnet list package --vulnerable --include-transitive > "$OUT/dep-dotnet.txt" 2>&1 )
+    DN=$?
+    # 통과는 "취약 없음" 문구를 확인했을 때만. 일부 프로젝트가 에러로 빠져도 나머지는
+    # "no vulnerable packages" 를 찍으므로 error 줄이 하나라도 있으면 판정 불가로 본다
+    if grep -qi "has the following vulnerable packages" "$OUT/dep-dotnet.txt"; then
+      fail "G3 dotnet 취약 패키지 -> $OUT/dep-dotnet.txt"
+    elif [ $DN -ne 0 ] || grep -qiE "^[[:space:]]*error" "$OUT/dep-dotnet.txt" \
+         || ! grep -qi "has no vulnerable packages" "$OUT/dep-dotnet.txt"; then
+      fail "G3 dotnet 판정 불가 (종료코드 $DN) -> $OUT/dep-dotnet.txt"
+    else
+      pass "G3 dotnet 취약 패키지 없음"
+    fi
   fi
 fi
 [ $DEP_RAN -eq 0 ] && skip "G3 인식 가능한 매니페스트 없음"
