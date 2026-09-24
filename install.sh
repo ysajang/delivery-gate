@@ -7,8 +7,18 @@ mkdir -p "$HERE/bin"
 TAG="$(curl -sIL -o /dev/null -w '%{url_effective}' https://github.com/gitleaks/gitleaks/releases/latest | sed 's#.*/tag/##')"
 VER="${TAG#v}"
 echo "gitleaks $TAG 설치"
-curl -sL "https://github.com/gitleaks/gitleaks/releases/download/${TAG}/gitleaks_${VER}_linux_x64.tar.gz" -o /tmp/gl.tar.gz
+GL_URL="https://github.com/gitleaks/gitleaks/releases/download/${TAG}"
+GL_TGZ="gitleaks_${VER}_linux_x64.tar.gz"
+curl -sfL "$GL_URL/$GL_TGZ" -o /tmp/gl.tar.gz
+curl -sfL "$GL_URL/gitleaks_${VER}_checksums.txt" -o /tmp/gl.sums
+GL_EXP="$(awk -v f="$GL_TGZ" '$2==f{print $1}' /tmp/gl.sums)"
+GL_ACT="$(sha256sum /tmp/gl.tar.gz | awk '{print $1}')"
+if [ -z "$GL_EXP" ] || [ "$GL_EXP" != "$GL_ACT" ]; then
+  rm -f /tmp/gl.tar.gz /tmp/gl.sums
+  echo "gitleaks 체크섬 불일치 -> 설치 중단"; exit 1
+fi
 tar xzf /tmp/gl.tar.gz -C "$HERE/bin" gitleaks
+rm -f /tmp/gl.tar.gz /tmp/gl.sums
 chmod +x "$HERE/bin/gitleaks"
 "$HERE/bin/gitleaks" version
 
