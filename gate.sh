@@ -166,6 +166,52 @@ if has_glob "$TARGET/*.sln" || has_glob "$TARGET/*.csproj"; then
     fi
   fi
 fi
+# Gradle(안드로이드 포함)·Python -> osv-scanner. npm 은 위 npm audit 이 담당하므로 요약에서 제외
+IS_GRADLE=0; IS_PY=0
+for f in settings.gradle settings.gradle.kts build.gradle build.gradle.kts; do
+  [ -f "$TARGET/$f" ] && IS_GRADLE=1
+done
+for f in pyproject.toml Pipfile.lock poetry.lock uv.lock; do
+  [ -f "$TARGET/$f" ] && IS_PY=1
+done
+has_glob "$TARGET/requirements*.txt" && IS_PY=1
+GRADLE_LOCK=0
+if [ $IS_GRADLE -eq 1 ]; then
+  DEP_RAN=1
+  if [ -n "$(find "$TARGET" -name gradle.lockfile -not -path '*/build/*' -not -path '*/.gradle/*' -print -quit 2>/dev/null)" ]; then
+    GRADLE_LOCK=1
+  else
+    # 락파일 없이는 전이 의존성 버전을 확정할 수 없다 -> 통과가 아니라 미실행으로 표시
+    skip "G3 gradle 락파일 없음 -> build.gradle 에 dependencyLocking { lockAllConfigurations() } 추가 후 ./gradlew :app:dependencies --write-locks"
+  fi
+fi
+if [ $IS_PY -eq 1 ] || [ $GRADLE_LOCK -eq 1 ]; then
+  DEP_RAN=1
+  if ! command -v osv-scanner >/dev/null 2>&1; then
+    fail "G3 osv-scanner 미설치 -> install.sh 실행"
+  else
+    osv-scanner scan source -r --format json --output-file "$OUT/dep-osv.json" "$TARGET" \
+      > "$OUT/dep-osv.log" 2>&1
+    OSV=$?
+    case $OSV in
+      0|1)
+        SUM_OSV="$(python3 "$HERE/lib/osv_summary.py" "$OUT/dep-osv.json")"
+        IFS='|' read -r O_BLOCK O_WARN O_TOTAL O_PKGS <<< "$SUM_OSV"
+        if [ "${O_BLOCK:--1}" -lt 0 ] 2>/dev/null; then
+          fail "G3 osv 결과 판정 불가 (${O_PKGS:-원인불명}) -> $OUT/dep-osv.json"
+        elif [ "$O_BLOCK" -gt 0 ]; then
+          fail "G3 python·gradle 취약점 ${O_BLOCK}건 (CVSS 7.0 이상 또는 등급 미기재: ${O_PKGS}) -> $OUT/dep-osv.json"
+        else
+          pass "G3 python·gradle 차단 대상 취약점 없음"
+        fi
+        [ "${O_WARN:-0}" -gt 0 ] 2>/dev/null \
+          && warn "G3 python·gradle 7.0 미만 취약점 ${O_WARN}건 (차단 대상 아님) -> $OUT/dep-osv.json"
+        ;;
+      128) fail "G3 osv-scanner 패키지 0개 -> 매니페스트를 읽지 못함, 판정 불가 -> $OUT/dep-osv.log" ;;
+      *)   fail "G3 osv-scanner 실행 실패 (종료코드 $OSV, 네트워크 확인) -> $OUT/dep-osv.log" ;;
+    esac
+  fi
+fi
 [ $DEP_RAN -eq 0 ] && skip "G3 인식 가능한 매니페스트 없음"
 
 # ---------- 요약 ----------

@@ -6,7 +6,7 @@
 - `lib/` 게이트가 호출하는 판정 스크립트 (python3 표준 라이브러리만 사용)
 - `rules/gitleaks.toml` G1 룰 (gitleaks 기본 룰 + 추가 룰)
 - `tests/` 회귀 테스트
-- `install.sh` 외부 도구 설치 (WSL/Ubuntu 기준)
+- `install.sh` 외부 도구 설치 (WSL/Ubuntu 기준, gitleaks·osv-scanner·semgrep)
 - `manual-checks.md` 스캐너가 못 잡는 수동 확인 목록
 - `skills/delivery-gate/SKILL.md` 게이트 운용 절차
 
@@ -21,6 +21,8 @@
 - 판정 스크립트: `python3 -m py_compile lib/*.py`
 - G1 룰: `./tests/test_g1_rules.sh` (gitleaks 필요)
 - G3 composer·dotnet 분기: `./tests/test_g3_fallbacks.sh` (실제 composer·dotnet 이 PATH 에 없어야 한다. 스텁으로 흉내 냄)
+- G3 osv 요약 판정: `./tests/test_osv_summary.sh`
+- G3 Gradle·Python 통합: `./tests/test_g3_osv.sh` (osv-scanner 와 네트워크 필요)
 
 ## 원칙
 

@@ -6,7 +6,7 @@
 
     ./install.sh
 
-gitleaks 최신 바이너리를 `bin/`에 내려받고 semgrep을 설치한다.
+gitleaks·osv-scanner 최신 바이너리를 `bin/`에 내려받고(osv-scanner 는 공식 체크섬 대조) semgrep을 설치한다.
 
 ## 사용
 
@@ -21,7 +21,7 @@ gitleaks 최신 바이너리를 `bin/`에 내려받고 semgrep을 설치한다.
 |---|---|---|
 | G1 | 시크릿 (작업트리 + 커밋이력) | gitleaks `dir`, `git` + `rules/gitleaks.toml` |
 | G2 | 취약 패턴, ERROR 등급만 | semgrep `p/default` + `p/owasp-top-ten` + 스택별 |
-| G3 | 취약 의존성 (프로덕션만 차단) | npm audit / composer audit / dotnet list package |
+| G3 | 취약 의존성 (프로덕션만 차단) | npm audit / composer audit / dotnet list package / osv-scanner(Gradle·Python) |
 
 하나라도 걸리면 exit 1. 결과는 `reports/<리포명>-<타임스탬프>/`에 남는다.
 
@@ -47,6 +47,14 @@ dev 쪽 건수는 `WARN`으로만 표시한다.
 수정본이 없는 high 취약점은 차단하지 않고 `WARN` 으로 기록만 한다. 손쓸 수 없는
 항목으로 납품을 영구히 막으면 게이트를 우회하게 되기 때문이다. 대신 납품 문서의
 "점검하지 않은 범위"에 그 목록을 적는다. critical 은 수정본이 없어도 차단한다.
+
+Gradle(안드로이드 포함)·Python 은 osv-scanner 로 본다. CVSS 7.0 이상과 등급 미기재는 차단,
+그 아래는 `WARN`. npm 결과는 npm audit 이 판정하므로 여기서 세지 않는다.
+Gradle 은 `gradle.lockfile` 이 있어야 전이 의존성 버전이 확정된다. 없으면 `SKIP` 으로
+표시한다(통과 아님). Python 은 dev 의존성을 구분하지 못해 전부 차단 기준에 들어간다.
+osv-scanner 는 osv.dev 에 패키지 이름·버전을 조회하므로 네트워크가 필요하다.
+
+composer·dotnet·osv-scanner 가 없거나 결과를 해석할 수 없으면 `FAIL`(판정 불가)이다.
 
 ## 한계
 

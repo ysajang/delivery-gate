@@ -12,6 +12,23 @@ tar xzf /tmp/gl.tar.gz -C "$HERE/bin" gitleaks
 chmod +x "$HERE/bin/gitleaks"
 "$HERE/bin/gitleaks" version
 
+# --- osv-scanner (G3 Gradle·Python) ---
+# 공식 체크섬과 대조한 뒤에만 설치한다
+OSV_TAG="$(curl -sIL -o /dev/null -w '%{url_effective}' https://github.com/google/osv-scanner/releases/latest | sed 's#.*/tag/##')"
+OSV_URL="https://github.com/google/osv-scanner/releases/download/${OSV_TAG}"
+echo "osv-scanner $OSV_TAG 설치"
+curl -sfL "$OSV_URL/osv-scanner_linux_amd64" -o /tmp/osv-scanner.bin
+curl -sfL "$OSV_URL/osv-scanner_SHA256SUMS" -o /tmp/osv-scanner.sums
+OSV_EXP="$(awk '$2=="osv-scanner_linux_amd64"{print $1}' /tmp/osv-scanner.sums)"
+OSV_ACT="$(sha256sum /tmp/osv-scanner.bin | awk '{print $1}')"
+if [ -z "$OSV_EXP" ] || [ "$OSV_EXP" != "$OSV_ACT" ]; then
+  rm -f /tmp/osv-scanner.bin /tmp/osv-scanner.sums
+  echo "osv-scanner 체크섬 불일치 -> 설치 중단"; exit 1
+fi
+install -m 0755 /tmp/osv-scanner.bin "$HERE/bin/osv-scanner"
+rm -f /tmp/osv-scanner.bin /tmp/osv-scanner.sums
+"$HERE/bin/osv-scanner" --version
+
 # --- semgrep ---
 find_semgrep() {
   command -v semgrep 2>/dev/null && return 0
